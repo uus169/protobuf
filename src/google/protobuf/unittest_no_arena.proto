@@ -44,6 +44,7 @@ option cc_generic_services = true;     // auto-added
 option java_generic_services = true;   // auto-added
 option py_generic_services = true;     // auto-added
 option cc_enable_arenas = false;
+option objc_class_prefix = "NOARN";
 
 import "google/protobuf/unittest_import.proto";
 import "google/protobuf/unittest_arena.proto";
@@ -199,3 +200,7 @@ enum ForeignEnum {
 message TestNoArenaMessage {
   optional proto2_arena_unittest.ArenaMessage arena_message = 1;
 };
+
+message OneString {
+  optional string data = 1;
+}

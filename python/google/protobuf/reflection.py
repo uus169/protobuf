@@ -48,106 +48,22 @@ this file*.
 __author__ = 'robinson@google.com (Will Robinson)'
 
 
-from google.protobuf.internal import api_implementation
-from google.protobuf import descriptor as descriptor_mod
-from google.protobuf import message
+from google.protobuf import message_factory
+from google.protobuf import symbol_database
 
-_FieldDescriptor = descriptor_mod.FieldDescriptor
+# The type of all Message classes.
+# Part of the public interface, but normally only used by message factories.
+GeneratedProtocolMessageType = message_factory._GENERATED_PROTOCOL_MESSAGE_TYPE
 
-
-if api_implementation.Type() == 'cpp':
-  from google.protobuf.pyext import cpp_message as message_impl
-else:
-  from google.protobuf.internal import python_message as message_impl
-
-_NewMessage = message_impl.NewMessage
-_InitMessage = message_impl.InitMessage
+MESSAGE_CLASS_CACHE = {}
 
 
-class GeneratedProtocolMessageType(type):
-
-  """Metaclass for protocol message classes created at runtime from Descriptors.
-
-  We add implementations for all methods described in the Message class.  We
-  also create properties to allow getting/setting all fields in the protocol
-  message.  Finally, we create slots to prevent users from accidentally
-  "setting" nonexistent fields in the protocol message, which then wouldn't get
-  serialized / deserialized properly.
-
-  The protocol compiler currently uses this metaclass to create protocol
-  message classes at runtime.  Clients can also manually create their own
-  classes at runtime, as in this example:
-
-  mydescriptor = Descriptor(.....)
-  class MyProtoClass(Message):
-    __metaclass__ = GeneratedProtocolMessageType
-    DESCRIPTOR = mydescriptor
-  myproto_instance = MyProtoClass()
-  myproto.foo_field = 23
-  ...
-
-  The above example will not work for nested types. If you wish to include them,
-  use reflection.MakeClass() instead of manually instantiating the class in
-  order to create the appropriate class structure.
-  """
-
-  # Must be consistent with the protocol-compiler code in
-  # proto2/compiler/internal/generator.*.
-  _DESCRIPTOR_KEY = 'DESCRIPTOR'
-
-  def __new__(cls, name, bases, dictionary):
-    """Custom allocation for runtime-generated class types.
-
-    We override __new__ because this is apparently the only place
-    where we can meaningfully set __slots__ on the class we're creating(?).
-    (The interplay between metaclasses and slots is not very well-documented).
-
-    Args:
-      name: Name of the class (ignored, but required by the
-        metaclass protocol).
-      bases: Base classes of the class we're constructing.
-        (Should be message.Message).  We ignore this field, but
-        it's required by the metaclass protocol
-      dictionary: The class dictionary of the class we're
-        constructing.  dictionary[_DESCRIPTOR_KEY] must contain
-        a Descriptor object describing this protocol message
-        type.
-
-    Returns:
-      Newly-allocated class.
-    """
-    descriptor = dictionary[GeneratedProtocolMessageType._DESCRIPTOR_KEY]
-    bases = _NewMessage(bases, descriptor, dictionary)
-    superclass = super(GeneratedProtocolMessageType, cls)
-
-    new_class = superclass.__new__(cls, name, bases, dictionary)
-    return new_class
-
-  def __init__(cls, name, bases, dictionary):
-    """Here we perform the majority of our work on the class.
-    We add enum getters, an __init__ method, implementations
-    of all Message methods, and properties for all fields
-    in the protocol type.
-
-    Args:
-      name: Name of the class (ignored, but required by the
-        metaclass protocol).
-      bases: Base classes of the class we're constructing.
-        (Should be message.Message).  We ignore this field, but
-        it's required by the metaclass protocol
-      dictionary: The class dictionary of the class we're
-        constructing.  dictionary[_DESCRIPTOR_KEY] must contain
-        a Descriptor object describing this protocol message
-        type.
-    """
-    descriptor = dictionary[GeneratedProtocolMessageType._DESCRIPTOR_KEY]
-    _InitMessage(descriptor, cls)
-    superclass = super(GeneratedProtocolMessageType, cls)
-    superclass.__init__(name, bases, dictionary)
-
-
+# Deprecated. Please NEVER use reflection.ParseMessage().
 def ParseMessage(descriptor, byte_str):
   """Generate a new Message instance from this Descriptor and a byte string.
+
+  DEPRECATED: ParseMessage is deprecated because it is using MakeClass().
+  Please use MessageFactory.GetPrototype() instead.
 
   Args:
     descriptor: Protobuf Descriptor object
@@ -162,37 +78,18 @@ def ParseMessage(descriptor, byte_str):
   return new_msg
 
 
+# Deprecated. Please NEVER use reflection.MakeClass().
 def MakeClass(descriptor):
   """Construct a class object for a protobuf described by descriptor.
 
-  Composite descriptors are handled by defining the new class as a member of the
-  parent class, recursing as deep as necessary.
-  This is the dynamic equivalent to:
-
-  class Parent(message.Message):
-    __metaclass__ = GeneratedProtocolMessageType
-    DESCRIPTOR = descriptor
-    class Child(message.Message):
-      __metaclass__ = GeneratedProtocolMessageType
-      DESCRIPTOR = descriptor.nested_types[0]
-
-  Sample usage:
-    file_descriptor = descriptor_pb2.FileDescriptorProto()
-    file_descriptor.ParseFromString(proto2_string)
-    msg_descriptor = descriptor.MakeDescriptor(file_descriptor.message_type[0])
-    msg_class = reflection.MakeClass(msg_descriptor)
-    msg = msg_class()
+  DEPRECATED: use MessageFactory.GetPrototype() instead.
 
   Args:
     descriptor: A descriptor.Descriptor object describing the protobuf.
   Returns:
     The Message class object described by the descriptor.
   """
-  attributes = {}
-  for name, nested_type in descriptor.nested_types_by_name.items():
-    attributes[name] = MakeClass(nested_type)
-
-  attributes[GeneratedProtocolMessageType._DESCRIPTOR_KEY] = descriptor
-
-  return GeneratedProtocolMessageType(str(descriptor.name), (message.Message,),
-                                      attributes)
+  # Original implementation leads to duplicate message classes, which won't play
+  # well with extensions. Message factory info is also missing.
+  # Redirect to message_factory.
+  return symbol_database.Default().GetPrototype(descriptor)
